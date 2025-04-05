@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Steganography Web App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 20px;
+      background: linear-gradient(135deg, #1e1e2e, #3a3a5e);
+      color: white;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: auto;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    label,
+    select,
+    input,
+    button {
+      display: block;
+      margin: 10px auto;
+      font-size: 16px;
+    }
+
+    select,
+    input {
+      padding: 8px;
+      border: none;
+      border-radius: 5px;
+      width: 80%;
+    }
+
+    button {
+      background: #ff9800;
+      color: white;
+      padding: 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    button:hover {
+      background: #e68900;
+    }
+
+    .password-container {
+      position: relative;
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+    }
+
+    .file-upload-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+
+    .preview-container {
+      margin-top: 20px;
+    }
+
+    .preview-image {
+      max-width: 300px;
+      max-height: 300px;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+      margin: 0 10px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      background-color: #4CAF50;
+      transition: 0.4s;
+      border-radius: 34px;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.4s;
+      border-radius: 50%;
+    }
+
+    .switch input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+
+    #decodedMessageBox {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: rgba(0, 0, 0, 0.5);
+      border: 1px solid #4CAF50;
+      border-radius: 8px;
+      width: 80%;
+      margin-left: auto;
+      margin-right: auto;
+      font-size: 18px;
+    }
+
+    #downloadLink {
+      margin-top: 15px;
+      display: inline-block;
+      color: #fff;
+      background: #4CAF50;
+      padding: 10px 20px;
+      border-radius: 8px;
+      text-decoration: none;
+    }
+
+    #downloadLink:hover {
+      background: #3b9442;
+    }
+  </style>
+</head>
+<body onload="initializeForm()">
+  <h2>Steganography Web App</h2>
+
+  <form id="uploadForm" enctype="multipart/form-data">
+    <div class="container">
+      <label>Select Mode:</label>
+      <div>
+        <span id="mode-label-left">Image</span>
+        <label class="switch">
+          <input type="checkbox" id="toggle" onchange="updateForm()">
+          <span class="slider round"></span>
+        </label>
+        <span id="mode-label-right">Audio</span>
+      </div>
+
+      <div id="image-section">
+        <label for="operation">Select Operation:</label>
+        <select id="operation" name="operation" onchange="updateForm()">
+          <option value="encode">Encode</option>
+          <option value="decode">Decode</option>
+        </select>
+
+        <div class="file-upload-container">
+          <label for="file">Upload File:</label>
+          <input type="file" id="file" name="file" accept="image/*" onchange="previewImage()" required>
+          <div id="imagePreview" class="preview-container hidden">
+            <img id="previewImg" class="preview-image" src="" alt="Image Preview">
+          </div>
+        </div>
+
+        <label for="password">Enter Password:</label>
+        <div class="password-container">
+          <input type="password" id="password" name="password" required>
+          <span class="password-toggle" onclick="togglePasswordVisibility()">&#x1F441;</span>
+        </div>
+
+        <div id="encode-fields" class="hidden">
+          <label for="secret-text">Enter Secret Text:</label>
+          <input type="text" id="secret-text" name="secret_text" autocomplete="off">
+        </div>
+      </div>
+
+      <button type="submit">Submit</button>
+    </div>
+  </form>
+
+  <a id="downloadLink" href="#" style="display: none;" download>Download Encoded Image</a>
+  <div id="decodedMessageBox" class="hidden"></div>
+
+  <script>
+    function initializeForm() {
+      document.getElementById("toggle").checked = false;
+      updateForm();
+    }
+
+    function updateForm() {
+      const toggle = document.getElementById("toggle");
+      const imageSection = document.getElementById("image-section");
+      const encodeFields = document.getElementById("encode-fields");
+      const operation = document.getElementById("operation").value;
+
+      if (!toggle.checked) {
+        imageSection.classList.remove("hidden");
+        if (operation === "encode") {
+          encodeFields.classList.remove("hidden");
+        } else {
+          encodeFields.classList.add("hidden");
+        }
+      } else {
+        imageSection.classList.add("hidden");
+      }
+
+      // Clear inputs and UI on switch
+      document.getElementById("password").value = "";
+      document.getElementById("secret-text").value = "";
+      document.getElementById("file").value = "";
+      document.getElementById("imagePreview").classList.add("hidden");
+
+      document.getElementById("downloadLink").style.display = "none";
+      document.getElementById("decodedMessageBox").textContent = "";
+      document.getElementById("decodedMessageBox").classList.add("hidden");
+    }
+
+    function togglePasswordVisibility() {
+      const passwordInput = document.getElementById("password");
+      passwordInput.type = passwordInput.type === "password" ? "text" : "password";
+    }
+
+    function previewImage() {
+      const fileInput = document.getElementById("file");
+      const previewContainer = document.getElementById("imagePreview");
+      const previewImg = document.getElementById("previewImg");
+
+      if (fileInput.files && fileInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          previewImg.src = e.target.result;
+          previewContainer.classList.remove("hidden");
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+      } else {
+        previewContainer.classList.add("hidden");
+      }
+    }
+
+    document.getElementById('uploadForm').addEventListener('submit', async function (event) {
+      event.preventDefault();
+
+      // Reset download link and decoded message
+      document.getElementById('downloadLink').style.display = 'none';
+      const decodedMessageBox = document.getElementById("decodedMessageBox");
+      decodedMessageBox.textContent = "";
+      decodedMessageBox.classList.add("hidden");
+
+      const formData = new FormData();
+      const fileInput = document.getElementById('file');
+      const password = document.getElementById('password').value;
+      const toggle = document.getElementById('toggle').checked;
+      const operation = document.getElementById('operation').value;
+      const mode = toggle ? 'true' : 'false';
+
+      formData.append('mode', mode);
+      formData.append('operation', operation);
+      formData.append('password', password);
+
+      if (fileInput.files.length > 0) {
+        formData.append('file', fileInput.files[0]);
+      }
+
+      if (!toggle && operation === 'encode') {
+        const secretText = document.getElementById('secret-text').value;
+        formData.append('secret_text', secretText);
+      }
+
+      try {
+        const response = await fetch('http://127.0.0.1:5000/', {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          if (operation === "encode") {
+            const downloadLink = document.getElementById('downloadLink');
+            downloadLink.href = 'data:image/png;base64,' + result.encoded_image_base64;
+            downloadLink.style.display = 'block';
+            downloadLink.textContent = "Download Encoded Image";
+            decodedMessageBox.classList.add("hidden");
+          } else {
+            decodedMessageBox.textContent = "🔓 Decoded Message: " + result.decoded_message;
+            decodedMessageBox.classList.remove("hidden");
+            document.getElementById("downloadLink").style.display = 'none';
+          }
+
+          // Clear inputs
+          document.getElementById("password").value = "";
+          document.getElementById("secret-text").value = "";
+          document.getElementById("file").value = "";
+          document.getElementById("imagePreview").classList.add("hidden");
+        } else {
+          alert(result.message);
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        alert('Failed to process request.');
+      }
+    });
+  </script>
+</body>
+</html>
